@@ -8,6 +8,7 @@ import base64
 import logging # Import logging
 import os
 import glob
+from typing import Optional
 
 import config # Import the configuration
 
@@ -126,9 +127,9 @@ else:
 
 class ImageRequest(BaseModel):
     prompt: str
-    negative_prompt: str | None = None
-    guidance_scale: float | None = None  # Will be defaulted in endpoint if None
-    num_inference_steps: int | None = None # Will be defaulted in endpoint if None
+    negative_prompt: Optional[str] = None
+    guidance_scale: Optional[float] = None  # Will be defaulted in endpoint if None
+    num_inference_steps: Optional[int] = None # Will be defaulted in endpoint if None
 
 
 @app.get("/")

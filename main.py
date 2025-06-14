@@ -6,6 +6,8 @@ from PIL import Image
 import io
 import base64
 import logging # Import logging
+import os
+import glob
 
 import config # Import the configuration
 
@@ -23,45 +25,94 @@ if config.TORCH_DTYPE == "float16":
 elif config.TORCH_DTYPE == "float32":
     torch_dtype = torch.float32
 else:
-    # Default or raise error if misconfigured
     logger.warning(f"TORCH_DTYPE '{config.TORCH_DTYPE}' in config.py is not recognized. Defaulting to float16.")
     torch_dtype = torch.float16
 
+SUPPORTED_PIPELINES = {}
+logger.info(f"Attempting to load models. LOAD_MODELS_FROM_LOCAL: {config.LOAD_MODELS_FROM_LOCAL}")
 
-# Load the SDXL model using settings from config.py
-pipeline_text2image = AutoPipelineForText2Image.from_pretrained(
-    config.SDXL_MODEL_NAME,
-    torch_dtype=torch_dtype,
-    variant=config.VARIANT if config.VARIANT else None # Pass None if VARIANT is empty or None
-)
-logger.info(f"Loaded model {config.SDXL_MODEL_NAME} with dtype {config.TORCH_DTYPE} and variant '{config.VARIANT}'.")
+if config.LOAD_MODELS_FROM_LOCAL:
+    logger.info(f"Loading models from local directory: {config.LOCAL_MODELS_DIR}")
+    if not os.path.isdir(config.LOCAL_MODELS_DIR):
+        logger.warning(f"Local models directory not found: {config.LOCAL_MODELS_DIR}. No local models will be loaded.")
+    else:
+        local_model_paths = glob.glob(os.path.join(config.LOCAL_MODELS_DIR, "*.safetensors"))
+        if not local_model_paths:
+            logger.warning(f"No .safetensors files found in {config.LOCAL_MODELS_DIR}")
+        
+        for model_path in local_model_paths:
+            model_filename = os.path.basename(model_path)
+            model_key = model_filename[:-len(".safetensors")] # Remove .safetensors extension
+            logger.info(f"Attempting to load local model '{model_key}' from {model_path}...")
+            try:
+                pipeline = AutoPipelineForText2Image.from_single_file(
+                    model_path,
+                    torch_dtype=torch_dtype
+                    # variant is typically not used with from_single_file for .safetensors
+                )
+                if torch.cuda.is_available():
+                    pipeline = pipeline.to("cuda")
+                    logger.info(f"Moved local model '{model_key}' to GPU.")
+                else:
+                    logger.warning(f"CUDA not available for local model '{model_key}'. Running on CPU might be slow.")
+                SUPPORTED_PIPELINES[model_key] = pipeline
+                logger.info(f"Successfully loaded local model '{model_key}'.")
+            except Exception as e:
+                logger.error(f"Failed to load local model '{model_key}' from {model_path}: {e}", exc_info=True)
+        
+        if config.DEFAULT_MODEL_IDENTIFIER not in SUPPORTED_PIPELINES:
+            logger.warning(f"Default local model '{config.DEFAULT_MODEL_IDENTIFIER}' specified in config was not found or failed to load from {config.LOCAL_MODELS_DIR}.")
 
-# Check if CUDA is available and move the pipeline to GPU
-if torch.cuda.is_available():
-    pipeline_text2image = pipeline_text2image.to("cuda")
-    logger.info("CUDA is available. Model moved to GPU.")
+else: # Load from Hugging Face Hub
+    hub_model_id = config.DEFAULT_MODEL_IDENTIFIER
+    # Use the last part of the Hub ID as a key, or the full ID if it's simple
+    model_key = hub_model_id.split('/')[-1] if '/' in hub_model_id else hub_model_id
+    logger.info(f"Attempting to load model '{model_key}' (Hub ID: {hub_model_id}) from Hugging Face Hub...")
+    try:
+        pipeline = AutoPipelineForText2Image.from_pretrained(
+            hub_model_id,
+            torch_dtype=torch_dtype,
+            variant=config.VARIANT if config.VARIANT else None
+        )
+        if torch.cuda.is_available():
+            pipeline = pipeline.to("cuda")
+            logger.info(f"Moved Hub model '{model_key}' to GPU.")
+        else:
+            logger.warning(f"CUDA not available for Hub model '{model_key}'. Running on CPU might be slow.")
+        SUPPORTED_PIPELINES[model_key] = pipeline
+        logger.info(f"Successfully loaded model '{model_key}' (Hub ID: {hub_model_id}).")
+    except Exception as e:
+        logger.error(f"Failed to load model '{model_key}' (Hub ID: {hub_model_id}) from Hugging Face Hub: {e}", exc_info=True)
+
+if not SUPPORTED_PIPELINES:
+    logger.error("No models were successfully loaded. The API will not be able to generate images. Please check your configuration and model files.")
 else:
-    logger.warning("CUDA not available, running on CPU. This might be slow.")
+    logger.info(f"Available models for generation: {list(SUPPORTED_PIPELINES.keys())}")
+    # Log if the default model (from config) is available
+    if config.LOAD_MODELS_FROM_LOCAL: # Default is a local key
+        if config.DEFAULT_MODEL_IDENTIFIER in SUPPORTED_PIPELINES:
+             logger.info(f"Default model for local loading '{config.DEFAULT_MODEL_IDENTIFIER}' is available.")
+        # Warning already logged if not found
+    else: # Default is a Hub ID, its key should be in supported pipelines
+        hub_default_key = config.DEFAULT_MODEL_IDENTIFIER.split('/')[-1] if '/' in config.DEFAULT_MODEL_IDENTIFIER else config.DEFAULT_MODEL_IDENTIFIER
+        if hub_default_key in SUPPORTED_PIPELINES:
+            logger.info(f"Default Hub model '{hub_default_key}' (from ID '{config.DEFAULT_MODEL_IDENTIFIER}') is available.")
+        # Error already logged if Hub loading failed for this
+
 
 class ImageRequest(BaseModel):
     prompt: str
     negative_prompt: str | None = None
-    # Default guidance_scale and num_inference_steps might need adjustment based on the model in config
-    # For sdxl-turbo, these defaults are fine. For full SDXL, they might change.
-    guidance_scale: float = 0.0 if "turbo" in config.SDXL_MODEL_NAME else 7.5
-    num_inference_steps: int = 1 if "turbo" in config.SDXL_MODEL_NAME else 25
+    guidance_scale: float | None = None  # Will be defaulted in endpoint if None
+    num_inference_steps: int | None = None # Will be defaulted in endpoint if None
 
 
 @app.get("/")
 async def root():
-    return {"message": "Image Generation API is running. Use /generate/{model_name} to create images. Currently supported: sdxl"}
+    if not SUPPORTED_PIPELINES:
+        return {"message": "Image Generation API is running, but no models are currently loaded. Please check server logs and configuration."}
+    return {"message": f"Image Generation API is running. Use /generate/{{model_name}} to create images. Currently supported models: {list(SUPPORTED_PIPELINES.keys())}"}
 
-# For now, we only have one pipeline loaded based on config.SDXL_MODEL_NAME
-# This will serve as the pipeline for the 'sdxl' model_name endpoint.
-# Future enhancements could load multiple models into a dictionary of pipelines.
-SUPPORTED_PIPELINES = {
-    "sdxl": pipeline_text2image # The pipeline loaded from config
-}
 
 @app.post("/generate/{model_name}")
 async def generate_image(model_name: str, request: ImageRequest):
@@ -72,16 +123,27 @@ async def generate_image(model_name: str, request: ImageRequest):
 
     pipeline = SUPPORTED_PIPELINES[model_name]
     
-    # Adjust defaults based on model_name if necessary in the future.
-    # For now, ImageRequest defaults are based on config.SDXL_MODEL_NAME which aligns with the 'sdxl' model_name.
-    # If config.SDXL_MODEL_NAME was, for example, a non-turbo SDXL, the ImageRequest defaults would suit that.
+    # Determine generation parameters, applying defaults if not provided
+    is_turbo_model = "turbo" in model_name.lower() # Basic check, might need refinement
+    
+    current_guidance_scale = request.guidance_scale
+    if current_guidance_scale is None:
+        current_guidance_scale = 0.0 if is_turbo_model else 7.5
+        logger.info(f"guidance_scale not provided, defaulting to {current_guidance_scale} for model '{model_name}'.")
+
+    current_num_steps = request.num_inference_steps
+    if current_num_steps is None:
+        current_num_steps = 1 if is_turbo_model else 25 # SDXL Turbo often uses 1, full SDXL might use 20-50
+        logger.info(f"num_inference_steps not provided, defaulting to {current_num_steps} for model '{model_name}'.")
+
+    logger.info(f"Generating image with model '{model_name}', prompt='{request.prompt[:50]}...', guidance_scale={current_guidance_scale}, num_inference_steps={current_num_steps}")
 
     try:
         image = pipeline(
             prompt=request.prompt,
             negative_prompt=request.negative_prompt,
-            guidance_scale=request.guidance_scale, # These defaults are now set in ImageRequest based on config
-            num_inference_steps=request.num_inference_steps # These defaults are now set in ImageRequest based on config
+            guidance_scale=current_guidance_scale,
+            num_inference_steps=current_num_steps
         ).images[0]
 
         # Convert PIL Image to base64 string

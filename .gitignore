@@ -88,7 +88,8 @@ docs/_build/
 
 
 # Model files (often large, manage locally or with LFS)
-models/
+models/checkpoints/*.safetensors
+models/loras/*.safetensors
 
 # OS specific
 .DS_Store

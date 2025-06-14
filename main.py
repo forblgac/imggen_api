@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import torch
 from diffusers import AutoPipelineForText2Image
-from diffusers.schedulers import EulerDiscreteScheduler # Import EulerDiscreteScheduler
 from PIL import Image
 import io
 import base64
@@ -62,12 +61,12 @@ if config.LOAD_MODELS_FROM_LOCAL:
                     scheduler_config = dict(pipeline.scheduler.config) # Make a mutable copy
                     scheduler_config["prediction_type"] = custom_prediction_type
                     
-                    # Create a new scheduler instance with the updated prediction_type
-                    # Using EulerDiscreteScheduler as it's common and supports this.
+                    # Get the class of the current scheduler and re-instantiate with new config
+                    SchedulerClass = pipeline.scheduler.__class__
                     try:
-                        new_scheduler = EulerDiscreteScheduler.from_config(scheduler_config)
+                        new_scheduler = SchedulerClass.from_config(scheduler_config)
                         pipeline.scheduler = new_scheduler
-                        logger.info(f"Successfully applied prediction_type '{custom_prediction_type}' to scheduler for model '{model_key}'.")
+                        logger.info(f"Successfully applied prediction_type '{custom_prediction_type}' using {SchedulerClass.__name__} for model '{model_key}'.")
                     except Exception as scheduler_ex:
                         logger.error(f"Failed to create or apply new scheduler with custom prediction_type for model '{model_key}': {scheduler_ex}", exc_info=True)
                 else:

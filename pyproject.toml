@@ -12,8 +12,13 @@ dependencies = [
     "accelerate",
     "safetensors",
     "invisible_watermark",
+    "peft",
+    "starlette",
+    "pydantic",
+    "pydantic-core",
+    "typing-extensions",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.scripts]
 # To run the development server:
@@ -28,7 +33,4 @@ requires-python = ">=3.8"
 # uv specific configurations can go here if needed.
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "httpx",
-]
+test = ["pytest", "httpx"]

@@ -1,9 +1,0 @@
-fastapi
-uvicorn[standard]
-diffusers
-transformers
-torch
-pillow
-accelerate
-safetensors
-invisible_watermark

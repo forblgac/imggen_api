@@ -1,0 +1,28 @@
+[project]
+name = "imggen_api"
+version = "0.1.0"
+description = "API server for Image generation using SDXL and other models."
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "diffusers",
+    "transformers",
+    "torch",
+    "pillow",
+    "accelerate",
+    "safetensors",
+    "invisible_watermark"
+]
+requires-python = ">=3.8"
+
+[project.scripts]
+# To run the development server:
+# uv run dev
+# dev = "uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+
+# To run the application directly (uses host/port from config.py):
+# uv run start
+# start = "python main.py"
+
+[tool.uv]
+# uv specific configurations can go here if needed.

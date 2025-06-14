@@ -2,7 +2,7 @@
 
 # --- Model Loading Configuration ---
 # Set to True to load models from a local directory, False to load from Hugging Face Hub.
-LOAD_MODELS_FROM_LOCAL = False
+LOAD_MODELS_FROM_LOCAL = True
 
 # Directory where local .safetensors models are stored if LOAD_MODELS_FROM_LOCAL is True.
 # Example: "./models" or "/path/to/your/models"
@@ -21,7 +21,9 @@ DEFAULT_MODEL_IDENTIFIER = "illumiyumeXL_v35VPred"
 # Keys are model filenames without the .safetensors extension.
 # Example: {"my_v_pred_model": {"prediction_type": "v_prediction"}}
 LOCAL_MODEL_CONFIGS = {
-    "illumiyumeXL_v35VPred": {"prediction_type": "v_prediction"} # Example for your model
+    "illumiyumeXL_v35VPred": {
+        "prediction_type": "v_prediction"
+    }  # Example for your model
 }
 
 # Torch settings

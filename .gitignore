@@ -86,6 +86,10 @@ docs/_build/
 *.swo
 *~
 
+
+# Model files (often large, manage locally or with LFS)
+models/
+
 # OS specific
 .DS_Store
 Thumbs.db

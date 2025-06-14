@@ -28,6 +28,19 @@ The API can load models either from Hugging Face Hub or from a local directory c
 
 ### Using Local Models
 
+To ensure correct behavior for certain local models (e.g., v-prediction models), you can provide specific configurations via the `LOCAL_MODEL_CONFIGS` dictionary in `config.py`. The key should be the model's filename (without `.safetensors` extension), and the value is a dictionary of configurations. Currently, `"prediction_type"` is supported.
+
+Example in `config.py` for a v-prediction model named `my_v_pred_model.safetensors`:
+```python
+LOCAL_MODEL_CONFIGS = {
+    "my_v_pred_model": {"prediction_type": "v_prediction"},
+    # Add other model-specific configs here
+}
+```
+If a `prediction_type` is specified, the server will attempt to reconfigure the model's scheduler accordingly.
+
+**Steps to use local models:**
+
 1.  Create a directory (e.g., `mkdir models` in the project root).
 2.  Place your `.safetensors` model files into this directory.
 3.  In `config.py`:

@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import torch
 from diffusers import AutoPipelineForText2Image
+from diffusers.schedulers import EulerDiscreteScheduler # Import EulerDiscreteScheduler
 from PIL import Image
 import io
 import base64
@@ -50,6 +51,30 @@ if config.LOAD_MODELS_FROM_LOCAL:
                     torch_dtype=torch_dtype
                     # variant is typically not used with from_single_file for .safetensors
                 )
+
+                # Apply model-specific configurations like prediction_type
+                model_specific_config = config.LOCAL_MODEL_CONFIGS.get(model_key)
+                if model_specific_config and "prediction_type" in model_specific_config:
+                    custom_prediction_type = model_specific_config["prediction_type"]
+                    logger.info(f"Applying custom prediction_type '{custom_prediction_type}' for local model '{model_key}'.")
+                    
+                    # Get the original scheduler's config and update prediction_type
+                    scheduler_config = dict(pipeline.scheduler.config) # Make a mutable copy
+                    scheduler_config["prediction_type"] = custom_prediction_type
+                    
+                    # Create a new scheduler instance with the updated prediction_type
+                    # Using EulerDiscreteScheduler as it's common and supports this.
+                    try:
+                        new_scheduler = EulerDiscreteScheduler.from_config(scheduler_config)
+                        pipeline.scheduler = new_scheduler
+                        logger.info(f"Successfully applied prediction_type '{custom_prediction_type}' to scheduler for model '{model_key}'.")
+                    except Exception as scheduler_ex:
+                        logger.error(f"Failed to create or apply new scheduler with custom prediction_type for model '{model_key}': {scheduler_ex}", exc_info=True)
+                else:
+                    # Log the default prediction type if no custom one is set
+                    default_pred_type = pipeline.scheduler.config.get("prediction_type")
+                    logger.info(f"Using default prediction_type '{default_pred_type if default_pred_type else 'None (or not applicable)'}' for local model '{model_key}'.")
+
                 if torch.cuda.is_available():
                     pipeline = pipeline.to("cuda")
                     logger.info(f"Moved local model '{model_key}' to GPU.")

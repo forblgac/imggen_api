@@ -26,3 +26,9 @@ requires-python = ">=3.8"
 
 [tool.uv]
 # uv specific configurations can go here if needed.
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "httpx",
+]

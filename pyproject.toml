@@ -11,7 +11,7 @@ dependencies = [
     "pillow",
     "accelerate",
     "safetensors",
-    "invisible_watermark"
+    "invisible_watermark",
 ]
 requires-python = ">=3.8"
 

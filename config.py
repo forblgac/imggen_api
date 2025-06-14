@@ -13,7 +13,7 @@ LOCAL_MODELS_DIR = "./models"
 #   of the default model in LOCAL_MODELS_DIR (e.g., "my_sdxl_turbo_model").
 # - If LOAD_MODELS_FROM_LOCAL is False: This is the Hugging Face Hub model identifier
 #   (e.g., "stabilityai/sdxl-turbo").
-DEFAULT_MODEL_IDENTIFIER = "illumiyumeXL_v35VPred"
+DEFAULT_MODEL_IDENTIFIER = "waiNSFWIllustrious_v140"
 # Example for a local default model: DEFAULT_MODEL_IDENTIFIER = "my_local_sdxl"
 # Example for a full SDXL model from Hub: DEFAULT_MODEL_IDENTIFIER = "stabilityai/stable-diffusion-xl-base-1.0"
 
@@ -21,8 +21,8 @@ DEFAULT_MODEL_IDENTIFIER = "illumiyumeXL_v35VPred"
 # Keys are model filenames without the .safetensors extension.
 # Example: {"my_v_pred_model": {"prediction_type": "v_prediction"}}
 LOCAL_MODEL_CONFIGS = {
-    "illumiyumeXL_v35VPred": {
-        "prediction_type": "v_prediction"
+    "waiNSFWIllustrious_v140": {
+        "prediction_type": "epsilon"
     }  # Example for your model
 }
 
